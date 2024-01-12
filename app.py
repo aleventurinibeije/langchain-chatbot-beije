@@ -1,37 +1,47 @@
 import os
-import sys
-
-
+from flask import Flask, request, jsonify
 from langchain_community.document_loaders import DirectoryLoader
 from langchain.chains import ConversationalRetrievalChain
 from langchain.indexes import VectorstoreIndexCreator
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI,OpenAIEmbeddings
+from dotenv import load_dotenv
+from langchain_community.vectorstores import Chroma
+from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 
+load_dotenv()
 
-os.environ["OPENAI_API_KEY"] = "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"
+app = Flask(__name__)
 
-query = None
-if len(sys.argv) > 1:
-  query = sys.argv[1]
-
-loader = DirectoryLoader("data/")
-index = VectorstoreIndexCreator().from_loaders([loader])
+if os.path.exists("persist"):
+    print("Reusing index...\n")
+    vectorstore = Chroma(persist_directory="persist", embedding_function=OpenAIEmbeddings())
+    index = VectorStoreIndexWrapper(vectorstore=vectorstore)
+else:
+  loader = DirectoryLoader("data/")
+  index = VectorstoreIndexCreator(vectorstore_kwargs={"persist_directory": "persist"}).from_loaders([loader])
 
 chain = ConversationalRetrievalChain.from_llm(
-    llm=ChatOpenAI(model="gpt-3.5-turbo"),
+    llm=ChatOpenAI(openai_api_key=os.environ.get('OPENAPI_API_KEY'), model="gpt-3.5-turbo"),
     retriever=index.vectorstore.as_retriever(search_kwargs={"k": 2}),
 )
 
 chat_history = []
-while True:
-  if not query:
-    query = input("Prompt: ")
-  if query in ['quit', 'q', 'exit']:
-    sys.exit()
-  result = chain({"question": query, "chat_history": chat_history})
-  print(result['answer'])
 
-  chat_history.append((query, result['answer']))
-  query = None
 
-print(result['answer'])
+@app.route('/api/chat', methods=['POST'])
+def chat_endpoint():
+    global chat_history
+    query = request.json.get('query')
+
+    if query in ['quit', 'q', 'exit']:
+        return jsonify({"answer": "Goodbye!"})
+
+    result = chain({"question": query, "chat_history": chat_history})
+    answer = result['answer']
+
+    chat_history.append((query, answer))
+    return jsonify({"answer": answer})
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
