@@ -1,7 +1,6 @@
 import os
 import discord
 
-from flask import Flask, request, jsonify
 from langchain_community.document_loaders import DirectoryLoader
 from langchain.chains import ConversationalRetrievalChain
 from langchain.indexes import VectorstoreIndexCreator
@@ -14,8 +13,6 @@ from discord.ext import commands
 
 
 load_dotenv()
-
-app = Flask(__name__)
 
 template = """Sei Clara, BOT che si occuppa di illustrare il codice etico di Beije.
 Context: {context}
