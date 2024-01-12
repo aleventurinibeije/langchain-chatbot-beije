@@ -47,12 +47,16 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+chat_history = []
+
 @bot.command()
 async def question(ctx, *, question):
+    global chat_history
     try:
-        chat_history=[]
         result = chain({"question": question, "chat_history": chat_history})
         answer = result['answer']
+        print(answer)
+        chat_history.append((question, answer))
         await ctx.send(answer)
     except Exception as e:
         print(f"Error occurred: {e}")
